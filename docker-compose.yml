@@ -1,0 +1,157 @@
+# Menjalankan website presensi beserta tiga pendampingnya.
+#
+# Empat layanan menjalankan kode yang sama dengan tugas berbeda. Layanan wajah
+# Python tidak ada di sini karena siklus hidupnya berbeda: PHP memuat ulang kode
+# setiap permintaan, sedangkan model wajah dimuat sekali lalu menahan ratusan
+# megabita memori. Layanan itu dijalankan dari folder "face absen" dan dihubungi
+# lewat jaringan bersama di bawah ini.
+#
+# Sebelum menjalankan berkas ini, jaringan bersama harus dibuat sekali saja.
+# Jaringan itulah yang membuat wadah di sini bisa menghubungi layanan wajah
+# Python tanpa perlu membuka layanan itu ke seluruh jaringan sekolah:
+#
+#     docker network create absen-jaringan
+#
+# Lalu:
+#     docker compose up -d --build
+#     docker compose ps
+#
+# Berkas .env dipakai apa adanya sebagai sumber pengaturan. Yang berbeda karena
+# dijalankan di dalam Docker ditulis pada bagian environment di bawah.
+
+name: absenmu
+
+# Pengaturan bersama layanan PHP. Semua memakai citra yang sama, hanya perintah
+# utamanya yang berbeda.
+x-php: &php
+    image: absenmu:latest
+    build:
+        context: .
+        target: app
+    restart: unless-stopped
+    init: true
+    env_file:
+        - .env
+    volumes:
+        # Basis data yang sama dengan yang dipakai saat aplikasi dijalankan
+        # langsung di komputer. Dengan begitu data presensi, anggota, dan sidik
+        # jari yang sudah ada tetap terpakai tanpa perlu pendaftaran ulang.
+        - ./database:/var/www/html/database
+    extra_hosts:
+        # Supaya bisa menjangkau layanan yang berjalan langsung di komputer
+        # sekolah, misalnya peramban atau alat lain yang dipasang di luar Docker.
+        - "host.docker.internal:host-gateway"
+    networks:
+        - absen-jaringan
+
+services:
+    # Inti aplikasi. Menerima permintaan PHP yang diteruskan nginx, dan menjalankan
+    # migrasi basis data saat pertama kali dinyalakan.
+    app:
+        <<: *php
+        environment:
+            # Wadah tidak bisa memakai 127.0.0.1 karena alamat itu menunjuk dirinya
+            # sendiri. Nilai di .env dipakai saat aplikasi berjalan langsung di
+            # komputer; di dalam Docker alamatnya adalah nama layanan wajah.
+            # Ubah FACE_SERVICE_DOCKER_URL di berkas .env bila namanya berbeda.
+            FACE_SERVICE_URL: ${FACE_SERVICE_DOCKER_URL:-http://wajah:5005}
+            # Catatan aplikasi diarahkan ke keluaran wadah supaya terbaca lewat
+            # "docker compose logs app". Tanpa ini catatan hanya menumpuk di dalam
+            # berkas laravel.log di dalam wadah.
+            LOG_CHANNEL: stderr
+            # Hanya layanan ini yang menjalankan migrasi.
+            RUN_MIGRATIONS: "true"
+        healthcheck:
+            test:
+                [
+                    "CMD",
+                    "php",
+                    "-r",
+                    "exit(@fsockopen('127.0.0.1', 9000) ? 0 : 1);",
+                ]
+            interval: 15s
+            timeout: 5s
+            retries: 5
+            start_period: 90s
+
+    # Satu satunya pintu masuk dari peramban dan dari alat di jaringan sekolah.
+    web:
+        build:
+            context: .
+            target: web
+        image: absenmu-web:latest
+        restart: unless-stopped
+        ports:
+            # Dibuka ke seluruh kartu jaringan karena alat presensi di jaringan
+            # sekolah perlu menghubunginya. Port di kiri diatur oleh APP_PORT di
+            # berkas .env, dan harus sama dengan APP_URL di berkas itu.
+            - "${APP_PORT:-8000}:80"
+        depends_on:
+            app:
+                condition: service_healthy
+        networks:
+            - absen-jaringan
+        healthcheck:
+            test:
+                [
+                    "CMD-SHELL",
+                    "wget -q -O /dev/null http://127.0.0.1/up || exit 1",
+                ]
+            interval: 30s
+            timeout: 5s
+            retries: 3
+            start_period: 30s
+
+    # Mengaktifkan sesi absen yang jamnya sudah masuk. Aplikasi menjadwalkan
+    # perintah itu tiap menit lewat schedule:work.
+    scheduler:
+        <<: *php
+        environment:
+            FACE_SERVICE_URL: ${FACE_SERVICE_DOCKER_URL:-http://wajah:5005}
+            LOG_CHANNEL: stderr
+        command: ["php", "artisan", "schedule:work"]
+        depends_on:
+            app:
+                condition: service_healthy
+
+    # Mengurus pekerjaan yang dijalankan di latar belakang. Saat ini aplikasi
+    # belum memakai antrean, jadi layanan ini diam menunggu. Tetap disediakan
+    # supaya pengiriman surel atau unggahan berkas di kemudian hari langsung
+    # berjalan tanpa perlu menambah layanan baru.
+    queue:
+        <<: *php
+        environment:
+            FACE_SERVICE_URL: ${FACE_SERVICE_DOCKER_URL:-http://wajah:5005}
+            LOG_CHANNEL: stderr
+        command:
+            [
+                "php",
+                "artisan",
+                "queue:work",
+                "--sleep=3",
+                "--tries=3",
+                "--max-time=3600",
+            ]
+        depends_on:
+            app:
+                condition: service_healthy
+
+    # Pendengar pesan MQTT dari sensor sidik jari. Perintah ini duduk menunggu
+    # pesan tanpa henti, jadi memang harus punya wadah sendiri dan tidak boleh
+    # menempel pada layanan app.
+    mqtt:
+        <<: *php
+        environment:
+            FACE_SERVICE_URL: ${FACE_SERVICE_DOCKER_URL:-http://wajah:5005}
+            LOG_CHANNEL: stderr
+        command: ["php", "artisan", "fingerprint:mqtt-listen"]
+        depends_on:
+            app:
+                condition: service_healthy
+
+networks:
+    # Jaringan bersama dengan layanan wajah Python di folder "face absen".
+    # Dibuat di luar berkas ini supaya kedua berkas tidak saling mengunci waktu
+    # dijalankan.
+    absen-jaringan:
+        external: true

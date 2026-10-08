@@ -1,0 +1,61 @@
+# Berkas yang tidak perlu ikut ke dalam citra Docker.
+#
+# Berbeda dengan .gitignore, berkas ini TIDAK boleh membuang vendor dan
+# public/build. Keduanya memang diabaikan git, tetapi justru dibutuhkan di
+# dalam citra: paket PHP dipasang lagi oleh tahap vendor, sedangkan aset depan
+# dibangun lagi oleh tahap aset.
+
+# Rahasia dan data sesi pengembangan
+.env
+.env.*
+!.env.example
+
+# Data asli di komputer. Basis data di dalam wadah dibuat sendiri oleh
+# perintah migrasi, dan berkas SQLite yang asli tidak boleh ikut ke citra.
+database/database.sqlite
+database/database.sqlite-journal
+database/*.sqlite
+database/*.sqlite-*
+
+# Isi ulang bagian ini di dalam citra lewat npm dan composer
+node_modules
+vendor
+
+# Hasil build lokal. Di dalam citra aset dibangun ulang supaya cocok dengan
+# berkas Blade yang sedang dipakai.
+public/build
+public/hot
+public/storage
+
+# Perkakas pengembangan yang tidak dipakai aplikasi
+.git
+.gitattributes
+.github
+.editorconfig
+.ai
+.claude
+.codegraph
+.mcp.json
+AGENTS.md
+CLAUDE.md
+boost.json
+tests
+phpunit.xml
+.phpunit.result.cache
+
+# Berkas pada penyimpanan
+storage/logs/*
+storage/framework/cache/data/*
+storage/framework/sessions/*
+storage/framework/views/*
+storage/pail
+storage/*.key
+
+# Berkas lain
+*.log
+npm-debug.log*
+Dockerfile
+docker-compose.yml
+.dockerignore
+README.md
+README-docker.md
