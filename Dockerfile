@@ -65,9 +65,25 @@ RUN composer dump-autoload --no-dev --optimize
 # ---------------------------------------------------------------------------
 # 3. Citra aplikasi (php-fpm)
 # ---------------------------------------------------------------------------
-FROM php:8.3-fpm-alpine AS app
+# Versi PHP di sini WAJIB sejalan dengan composer.lock, bukan dengan
+# "require.php" di composer.json yang masih longgar (^8.3). Tahap vendor
+# memasang paket mengikuti composer.lock, dan sejak symfony 8 beberapa paket
+# menuntut PHP >= 8.4.1. Bila citra memakai versi lebih tua, proses build tetap
+# berhasil tetapi setiap perintah artisan berhenti seketika dengan kode 255,
+# sehingga layanan queue, scheduler, dan mqtt berulang kali dinyalakan ulang.
+# Angka 8.5 dipilih supaya sama dengan PHP 8.5 yang dipakai saat pengembangan.
+FROM php:8.5-fpm-alpine AS app
 
 ENV TZ=Asia/Makassar
+
+# Pemeriksaan versi, supaya ketidakcocokan terbaca saat build dan bukan saat
+# wadah sudah dijalankan. PHP_VERSION_ID untuk 8.4.1 adalah 80401.
+RUN if php -r 'exit(PHP_VERSION_ID >= 80401 ? 0 : 1);'; then \
+        echo "versi PHP memenuhi kebutuhan composer.lock"; \
+    else \
+        echo 'BERHENTI: paket di composer.lock menuntut PHP >= 8.4.1'; \
+        exit 1; \
+    fi
 
 # Pemeriksaan kecil, bukan pemasangan: pdo_sqlite sudah aktif pada citra resmi
 # PHP. Baris ini memastikan, dan memberi pesan bila ternyata tidak ada, supaya

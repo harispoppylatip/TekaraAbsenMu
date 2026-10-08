@@ -61,13 +61,17 @@ services:
             LOG_CHANNEL: stderr
             # Hanya layanan ini yang menjalankan migrasi.
             RUN_MIGRATIONS: "true"
+        # Pemeriksaan kesehatan menempuh dua hal: kerangka Laravel benar benar
+        # bisa dimuat (php artisan --version) dan php-fpm menerima sambungan.
+        # Memeriksa soket php-fpm saja tidak cukup: php-fpm tidak memuat Laravel
+        # sebelum ada permintaan, sehingga kerusakan seperti versi PHP yang
+        # terlalu tua membuat layanan ini tetap tertulis sehat sementara queue,
+        # scheduler, dan mqtt berhenti berulang dengan kode 255.
         healthcheck:
             test:
                 [
-                    "CMD",
-                    "php",
-                    "-r",
-                    "exit(@fsockopen('127.0.0.1', 9000) ? 0 : 1);",
+                    "CMD-SHELL",
+                    "php artisan --version >/dev/null 2>&1 && php -r \"exit(@fsockopen('127.0.0.1', 9000) ? 0 : 1);\"",
                 ]
             interval: 15s
             timeout: 5s

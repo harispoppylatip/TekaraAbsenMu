@@ -180,7 +180,8 @@ dijalankan dengan `php artisan fingerprint:mqtt-listen`.
 
 ## Teknologi
 
-- PHP 8.3 atau lebih baru dengan Laravel 13
+- PHP 8.4.1 atau lebih baru dengan Laravel 13, karena paket di `composer.lock`
+  menuntut versi itu (citra Docker memakai PHP 8.5)
 - SQLite sebagai basis data, cukup satu berkas `database/database.sqlite`
 - Tailwind CSS 4 dan Vite 8 untuk tampilan
 - `php-mqtt/client` untuk menerima pesan dari sensor sidik jari
@@ -212,8 +213,8 @@ dan dihubungi lewat jaringan `absen-jaringan` dengan alamat default
 
 Cocok untuk mengembangkan aplikasi di komputer sendiri.
 
-Prasyarat: PHP 8.3 atau lebih baru dengan ekstensi `pdo_sqlite`, Composer 2, dan
-Node.js 20.19 atau lebih baru.
+Prasyarat: PHP 8.4.1 atau lebih baru dengan ekstensi `pdo_sqlite`, Composer 2,
+dan Node.js 20.19 atau lebih baru.
 
 ```
 composer install
