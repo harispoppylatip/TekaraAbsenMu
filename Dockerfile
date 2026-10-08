@@ -92,12 +92,28 @@ RUN php -m | grep -qi '^pdo_sqlite$' \
         && echo 'pdo_sqlite siap dipakai' \
         || echo 'PERINGATAN: pdo_sqlite tidak ada, basis data SQLite tidak akan jalan'
 
-# opcache mempercepat pemuatan kode, pcntl membuat perintah artisan bisa
-# dihentikan dengan rapi di dalam wadah.
+# Yang dipasang di sini hanya dua hal: tzdata supaya zona waktu WITA benar, dan
+# pcntl supaya perintah artisan bisa dihentikan dengan rapi di dalam wadah.
+# sqlite-libs tetap ditulis walau sudah ada di citra resmi supaya jelas dari mana
+# pustaka SQLite berasal; pdo_sqlite sendiri sudah menyatu di biner PHP dan sudah
+# diperiksa pada langkah di atas.
+#
+# opcache SENGAJA tidak ada di daftar docker-php-ext-install. Citra resmi PHP
+# sudah membangun opcache menyatu di dalam biner, jadi php -v menulis
+# "with Zend OPcache" dan tidak ada opcache.so di folder ekstensi (isi conf.d
+# hanya docker-fpm.ini dan docker-php-ext-sodium.ini). Meminta pemasangan opcache
+# membuat folder modules kosong, lalu make install berhenti dengan
+# "cp: can't stat 'modules/*'" dan build gagal dengan kode 2. Pengaturan opcache
+# tetap berlaku lewat docker/php/php.ini. Pemeriksaan di baris terakhir menjaga
+# hal itu: bila suatu saat citra resmi berhenti menyertakannya, build berhenti di
+# sini dengan pesan, bukan diam diam jalan tanpa opcache.
 RUN apk add --no-cache sqlite-libs tzdata \
     && apk add --no-cache --virtual .perkakas-bangun $PHPIZE_DEPS \
-    && docker-php-ext-install -j"$(nproc)" opcache pcntl \
-    && apk del .perkakas-bangun
+    && docker-php-ext-install -j"$(nproc)" pcntl \
+    && apk del .perkakas-bangun \
+    && php -m | grep -qi '^pcntl$' \
+    && php -m | grep -qi 'Zend OPcache' \
+    && echo 'pcntl terpasang dan opcache bawaan citra menyala'
 
 COPY docker/php/php.ini /usr/local/etc/php/conf.d/zz-absen.ini
 COPY docker/entrypoint.sh /usr/local/bin/masuk-wadah
