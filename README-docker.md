@@ -105,6 +105,19 @@ folder `database` dipasang dari komputer ini ke dalam wadah. Artinya:
 - Berkas aslinya tetap satu: `database/database.sqlite` di komputer ini. Yang
   perlu disalin untuk mencadangkan data adalah berkas itu.
 
+Folder `database` ikut dipasang dari komputer ini. Di Linux folder itu biasanya
+milik `root`, sedangkan PHP di dalam wadah berjalan sebagai `www-data`. Pemilik
+berkas SQLite saja tidak cukup: SQLite membuat berkas sementara di dalam folder
+itu setiap kali menyimpan, sehingga folder yang hanya bisa ditulis `root`
+membuat seluruh penyimpanan gagal. Wadah memperbaikinya sendiri setiap kali
+dinyalakan lewat `docker/entrypoint.sh`. Bila folder itu tidak bisa diperbaiki,
+catatan wadah akan menampilkan peringatan dan perintah yang perlu dijalankan di
+komputer ini:
+
+```
+sudo chown -R 82:82 database
+```
+
 Pada salinan baru dari GitHub berkas SQLite belum ada karena diabaikan git.
 Wadah akan membuatnya sendiri beserta seluruh tabelnya pada kali pertama
 dinyalakan. Setelah itu akun bawaan perlu dibuat:
@@ -197,6 +210,7 @@ Sensor memanggil alamat website, bukan sebaliknya. Karena itu:
 | Build menulis `PERINGATAN: pdo_sqlite tidak ada`               | Citra PHP dasar tidak memuat pdo_sqlite                                                                                  | Tambahkan `docker-php-ext-install pdo_sqlite` pada tahap `app` di Dockerfile                   |
 | Build berhenti dengan `cp: can't stat 'modules/*'` (kode 2)    | `opcache` diminta dipasang padahal citra PHP sudah menyertakannya                                                        | Keluarkan `opcache` dari `docker-php-ext-install`; cukup `pcntl` saja                          |
 | Layanan `web` terus `Restarting (1)`                           | nginx berhenti saat dinyalakan: `listen [::]:80;` ditolak pada mesin tanpa IPv6, atau `host not found in upstream "app"` | Jalankan `docker compose logs --tail=30 web` untuk melihat pesan `[emerg]` yang sebenarnya     |
+| Tombol Masuk dijawab `419 Page Expired`                        | Folder `database` milik `root` sehingga SQLite gagal menyimpan sesi dan token CSRF                                       | `sudo chown -R 82:82 database`, lalu `docker compose restart app web`                           |
 | Permintaan foto dibalas 413                                    | Ukuran kiriman melebihi batas nginx                                                                                      | Kirim foto lebih sedikit atau ubah `client_max_body_size` di `docker/nginx/default.conf`       |
 | Absen wajah gagal padahal unggah berhasil                      | Layanan wajah Python belum dinyalakan, atau belum berada di jaringan `absen-jaringan`                                    | Nyalakan layanan wajah, lalu `docker compose logs app` untuk melihat balasan layanan itu       |
 | Pesan MQTT tidak masuk                                         | Layanan `mqtt` mati atau pengaturan MQTT salah                                                                           | `docker compose logs -f mqtt`, periksa `MQTT_*` di `.env`                                      |
