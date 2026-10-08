@@ -222,6 +222,9 @@ Yang perlu diingat sebelum dipakai sungguhan:
 
 ## Berkas terkait
 
-- `README.md` di folder layanan wajah, berisi penjelasan layanan Python
-- Dokumentasi lebih dalam mengenai bagian wajah ada di `README-wajah.md` pada
-  folder layanan wajah
+- `README.md` pada repositori ini, pengenalan aplikasi, fitur, halaman menurut
+  peran, dan cara menjalankan tanpa Docker
+- `README.md` pada repositori layanan wajah, penjelasan layanan Python
+  pengenalan wajah beserta skrip pendaftarannya
+- `README-wajah.md` pada repositori layanan wajah, dokumentasi lebih dalam
+  mengenai bagian pengenalan wajah
