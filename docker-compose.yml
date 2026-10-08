@@ -71,7 +71,7 @@ services:
             test:
                 [
                     "CMD-SHELL",
-                    "php artisan --version >/dev/null 2>&1 && php -r \"exit(@fsockopen('127.0.0.1', 9000) ? 0 : 1);\"",
+                    'php artisan --version >/dev/null 2>&1 && php -r "exit(@fsockopen(''127.0.0.1'', 9000) ? 0 : 1);"',
                 ]
             interval: 15s
             timeout: 5s
